@@ -57,6 +57,12 @@ export default function NotesScreen() {
                       <Text style={{ color: c.muted, fontSize: 12, fontWeight: '700' }}>{item.checklist.filter((i) => i.done).length}/{item.checklist.length}</Text>
                     </View>
                   )}
+                  {item.files.length > 0 && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Icon name="attach-outline" size={14} color={c.muted} />
+                      <Text style={{ color: c.muted, fontSize: 12, fontWeight: '700' }}>{item.files.length}</Text>
+                    </View>
+                  )}
                   {item.images.length > 0 && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                       <Icon name="image-outline" size={13} color={c.muted} />

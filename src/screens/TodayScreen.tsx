@@ -5,15 +5,15 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { profileComplete, useScoped, useStore } from '../store';
 import type { IconName } from '../types';
-import { dayKey, PRIORITIES, timeLeft, toHHMM } from '../utils';
+import { dayKey, examName, fmtCountdown, fmtMinutes, focusStreak, PRIORITIES, timeLeft, toHHMM, weekStart } from '../utils';
 import { Empty, Icon, IconButton, ListRow, Pill, Section, useColors, useS } from '../ui';
 
 const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
 const fmtDur = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} giờ${m % 60 ? ` ${m % 60} phút` : ''}` : `${Math.max(m, 1)} phút`);
 
 export default function TodayScreen() {
-  const { focus, profile } = useStore();
-  const { classes, deadlines, subjects, semester } = useScoped();
+  const { focus, profile, attendance, setAttendance } = useStore();
+  const { classes, deadlines, subjects, semester, exams } = useScoped();
   const nav = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const s = useS();
@@ -34,6 +34,9 @@ export default function TodayScreen() {
     .filter((d) => new Date(d.due) >= now && new Date(d.due).getTime() <= now.getTime() + 7 * 86400_000)
     .sort((a, b) => a.due.localeCompare(b.due));
   const today = focus[dayKey()] ?? { sessions: 0, minutes: 0 };
+  const streak = focusStreak(focus);
+  const nextExam = exams.filter((e) => new Date(e.date).getTime() + e.durationMin * 60000 > Date.now()).sort((a, b) => a.date.localeCompare(b.date))[0];
+  const weekMin = Array.from({ length: 7 }, (_, i) => { const d = weekStart(); d.setDate(d.getDate() + i); return focus[dayKey(d)]?.minutes ?? 0; }).reduce((a, b) => a + b, 0);
   const hour = now.getHours();
   const first = profile.name.trim().split(/\s+/).pop();
   const greet = `${hour < 12 ? 'Chào buổi sáng' : hour < 18 ? 'Chào buổi chiều' : 'Chào buổi tối'}${first ? `, ${first}` : ''}`;
@@ -52,9 +55,9 @@ export default function TodayScreen() {
       {focused && <StatusBar style={c.dark ? 'dark' : 'light'} />}
 
       {/* Khối đầu trang đặc màu chủ đạo, giữ gọn trong khoảng 1/4 màn hình */}
-      <View style={{ backgroundColor: c.primary, paddingTop: insets.top + 12, paddingHorizontal: 20, paddingBottom: 16 }}>
+      <View style={{ backgroundColor: c.primary, paddingTop: insets.top + 18, paddingHorizontal: 20, paddingBottom: 22 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <View style={{ width: 54, paddingVertical: 6, borderRadius: 12, alignItems: 'center', backgroundColor: on + '26' }}>
+          <View style={{ width: 58, paddingVertical: 8, borderRadius: 12, alignItems: 'center', backgroundColor: on + '26' }}>
             <Text style={{ color: on, fontSize: 24, fontWeight: '800', lineHeight: 28, fontVariant: ['tabular-nums'] }}>{now.getDate()}</Text>
             <Text style={{ color: on, opacity: 0.85, fontSize: 10, fontWeight: '800', letterSpacing: 0.6 }}>THG {now.getMonth() + 1}</Text>
           </View>
@@ -65,13 +68,13 @@ export default function TodayScreen() {
               </Text>
               <Icon name="chevron-forward" size={12} color={on} />
             </Pressable>
-            <Text style={{ color: on, fontSize: 22, fontWeight: '800', letterSpacing: -0.5, marginTop: 1 }}>{greet}</Text>
+            <Text style={{ color: on, fontSize: 22, fontWeight: '800', letterSpacing: -0.5, marginTop: 4 }}>{greet}</Text>
           </View>
           <IconButton name="settings-outline" size={22} color={on} onPress={() => nav.navigate('Cài đặt')} />
         </View>
 
         {/* Hồ sơ: tối đa hai dòng, tự xuống dòng khi tên trường dài */}
-        <Pressable onPress={() => nav.navigate('Profile')} hitSlop={6} style={{ marginTop: 12, gap: 4 }}>
+        <Pressable onPress={() => nav.navigate('Profile')} hitSlop={6} style={{ marginTop: 18, gap: 8 }}>
           {profileComplete(profile) ? (
             <>
               {!!profile.name.trim() && (
@@ -79,7 +82,7 @@ export default function TodayScreen() {
                   {profile.name}{profile.studentId ? `  ·  ${profile.studentId}` : ''}
                 </Text>
               )}
-              <Text style={{ color: on, opacity: 0.9, fontSize: 13, fontWeight: '600', lineHeight: 18 }}>{profile.school} · {profile.className}</Text>
+              <Text style={{ color: on, opacity: 0.9, fontSize: 13, fontWeight: '600', lineHeight: 19 }}>{profile.school} · {profile.className}</Text>
             </>
           ) : (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -91,7 +94,7 @@ export default function TodayScreen() {
         </Pressable>
 
         {/* Tiết đang / sắp diễn ra */}
-        <Pressable onPress={() => next && nav.navigate('ClassDetail', { id: next.id })} disabled={!next} style={{ backgroundColor: c.card, borderRadius: 12, padding: 12, marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <Pressable onPress={() => next && nav.navigate('ClassDetail', { id: next.id })} disabled={!next} style={{ backgroundColor: c.card, borderRadius: 12, padding: 14, marginTop: 20, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           {next ? (
             <View style={{ width: 4, alignSelf: 'stretch', borderRadius: 2, backgroundColor: sub(next.subjectId)?.color ?? c.primary }} />
           ) : (
@@ -112,7 +115,7 @@ export default function TodayScreen() {
             ) : (
               <>
                 <Text style={{ fontSize: 15, fontWeight: '800', color: c.text }}>{todayClasses.length ? 'Đã hết tiết hôm nay' : 'Không có tiết học hôm nay'}</Text>
-                <Text style={{ color: c.muted, fontSize: 12, marginTop: 1 }}>{todayClasses.length ? 'Nghỉ ngơi hoặc ôn bài một chút nhé.' : 'Tận hưởng ngày rảnh hoặc ôn bài.'}</Text>
+                <Text style={{ color: c.muted, fontSize: 12, marginTop: 3 }}>{todayClasses.length ? 'Nghỉ ngơi hoặc ôn bài một chút nhé.' : 'Tận hưởng ngày rảnh hoặc ôn bài.'}</Text>
               </>
             )}
           </View>
@@ -145,6 +148,26 @@ export default function TodayScreen() {
           </View>
         </View>
 
+        <ListRow onPress={() => nav.navigate('WeeklyReview')}>
+          <Icon name="stats-chart-outline" size={20} color={c.primary} />
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={s.title}>Tổng kết tuần</Text>
+            <Text style={s.sub}>{weekMin ? fmtMinutes(weekMin) : 'Chưa tập trung'} tuần này{streak.current > 0 ? ` · chuỗi ${streak.current} ngày` : ''}</Text>
+          </View>
+          <Icon name="chevron-forward" size={18} color={c.muted} />
+        </ListRow>
+
+        <ListRow onPress={() => nav.navigate('ExamList')}>
+          <Icon name="school-outline" size={20} color={c.primary} />
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={s.title}>Lịch thi</Text>
+            <Text numberOfLines={1} style={s.sub}>
+              {nextExam ? `${examName(nextExam, subjects)} · còn ${fmtCountdown(new Date(nextExam.date).getTime() - Date.now(), nextExam.durationMin)}` : 'Chưa có kỳ thi sắp tới'}
+            </Text>
+          </View>
+          <Icon name="chevron-forward" size={18} color={c.muted} />
+        </ListRow>
+
         <Section text="Lịch học hôm nay" />
         {todayClasses.length === 0 && <Empty icon="cafe-outline" text="Không có tiết nào hôm nay" action={{ label: 'Thêm tiết học', onPress: () => nav.navigate('ClassForm', { weekday: now.getDay() + 1 }) }} />}
         {todayClasses.map((x, i) => {
@@ -160,6 +183,20 @@ export default function TodayScreen() {
                 <Text style={s.title}>{sb?.name ?? 'Môn học'}</Text>
                 <Text style={s.sub}>{x.room || 'Chưa có phòng'}</Text>
               </View>
+              {(sb?.maxAbsent ?? 0) > 0 && (
+                <View style={{ flexDirection: 'row', gap: 6, marginLeft: 8 }}>
+                  {([['present', 'checkmark', c.success], ['absent', 'close', c.danger]] as const).map(([st, ic, tone]) => {
+                    const rec = attendance.find((a) => a.classId === x.id && a.date === dayKey());
+                    const on = rec?.status === st;
+                    return (
+                      <Pressable key={st} hitSlop={4} onPress={() => setAttendance(x.id, x.subjectId, dayKey(), on ? undefined : st)}
+                        style={{ width: 32, height: 32, borderRadius: 8, borderWidth: 1, borderColor: on ? tone : c.border, backgroundColor: on ? tone : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon name={ic} size={16} color={on ? '#fff' : c.muted} />
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
             </ListRow>
           );
         })}

@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { ReactNode, useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TextInputProps, View, useColorScheme } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TextInputProps, View, useColorScheme } from 'react-native';
+import { showAlert } from './dialog';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useScoped, useStore } from './store';
 import type { IconName } from './types';
@@ -328,7 +329,7 @@ export function SubjectDot({ id }: { id?: string }) {
 }
 
 export const confirm = (title: string, onOk: () => void, okText = 'Xóa') =>
-  Alert.alert(title, undefined, [{ text: 'Hủy', style: 'cancel' }, { text: okText, style: 'destructive', onPress: onOk }]);
+  showAlert(title, undefined, [{ text: 'Hủy', style: 'cancel' }, { text: okText, style: 'destructive', onPress: onOk }]);
 
 /** Nhóm nút chọn 1 trong nhiều, chia đều chiều ngang */
 export function Segmented<T extends string>({ options, value, onChange }: {
@@ -427,6 +428,37 @@ export const StatRow = ({ items }: { items: { value: string; label: string; colo
           <Text numberOfLines={1} style={[s.sub, { marginTop: 0 }]}>{x.label}</Text>
         </View>
       ))}
+    </View>
+  );
+};
+
+/** Nút nhỏ có icon dùng khi điểm danh: bấm lần nữa để bỏ chọn */
+export const AttBtn = ({ label, icon, tone, active, onPress }: { label: string; icon: IconName; tone: string; active: boolean; onPress: () => void }) => {
+  const c = useColors();
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 7, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: active ? tone : c.border, backgroundColor: active ? tone : 'transparent', opacity: pressed ? 0.7 : 1 })}>
+      <Ionicons name={icon} size={14} color={active ? '#fff' : c.muted} />
+      <Text style={{ color: active ? '#fff' : c.text, fontSize: 13, fontWeight: active ? '700' : '500' }}>{label}</Text>
+    </Pressable>
+  );
+};
+
+/** Đồng hồ số buổi đã vắng so với giới hạn: xanh → vàng (còn 1 buổi) → đỏ (đã chạm) */
+export const AbsentMeter = ({ absent, max }: { absent: number; max: number }) => {
+  const c = useColors();
+  const s = useS();
+  const tone = absent >= max ? c.danger : absent === max - 1 ? c.warning : c.success;
+  const msg = absent >= max ? 'Đã chạm giới hạn vắng, không được vắng thêm!' : absent === max - 1 ? 'Chỉ còn 1 buổi được vắng.' : `Còn ${max - absent} buổi được vắng.`;
+  return (
+    <View style={{ marginBottom: 8 }}>
+      <View style={[s.row, { marginBottom: 6 }]}>
+        <Text style={{ color: c.text, fontWeight: '700' }}>Đã vắng</Text>
+        <Text style={{ color: tone, fontWeight: '800', fontVariant: ['tabular-nums'] }}>{absent} / {max} buổi</Text>
+      </View>
+      <View style={{ height: 6, borderRadius: 3, backgroundColor: c.chip }}>
+        <View style={{ width: `${Math.min(100, (absent / Math.max(1, max)) * 100)}%`, height: 6, borderRadius: 3, backgroundColor: tone }} />
+      </View>
+      <Text style={{ color: tone, fontSize: 12, fontWeight: '600', marginTop: 6 }}>{msg}</Text>
     </View>
   );
 };

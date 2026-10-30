@@ -1,22 +1,27 @@
 {
   "expo": {
-    "name": "student-planner",
+    "name": "Student Planner",
     "slug": "student-planner",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "vn.studentplanner.app"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#2447F5",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "vn.studentplanner.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -29,7 +34,28 @@
           "photosPermission": "Cho phép Student Planner chọn ảnh để đính kèm vào ghi chú.",
           "cameraPermission": "Cho phép Student Planner chụp ảnh bảng, tài liệu để đính kèm vào ghi chú."
         }
-      ]
-    ]
+      ],
+      "expo-sharing",
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "dark": {
+            "backgroundColor": "#0f0f0e"
+          }
+        }
+      ],
+      "expo-font"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "2a6f1506-297a-4c10-a869-9e09e3d49dcb"
+      }
+    },
+    "owner": "tranvanhuy"
   }
 }

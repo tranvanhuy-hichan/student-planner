@@ -1,0 +1,64 @@
+# Build file .ipa CHƯA KÝ để cài lên iPhone bằng AltStore / SideStore / Sideloadly.
+# Các công cụ đó sẽ ký lại bằng Apple ID của bạn. Chạy: tab Actions → "Build iOS IPA" → Run workflow.
+name: Build iOS IPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Cài thư viện
+        run: npm ci
+
+      - name: Tạo dự án iOS gốc (expo prebuild)
+        run: npx expo prebuild --platform ios --no-install
+
+      - name: Bỏ quyền thông báo đẩy (tài khoản Apple miễn phí không có quyền này; thông báo hẹn giờ tại máy vẫn hoạt động)
+        run: |
+          for f in ios/*/*.entitlements; do
+            /usr/libexec/PlistBuddy -c "Delete :aps-environment" "$f" || true
+          done
+
+      - name: Cài CocoaPods
+        run: cd ios && pod install
+
+      - name: Build bản Release không ký
+        run: |
+          WORKSPACE=$(ls -d ios/*.xcworkspace | head -n 1)
+          SCHEME=$(basename "$WORKSPACE" .xcworkspace)
+          xcodebuild \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build
+          echo "SCHEME=$SCHEME" >> "$GITHUB_ENV"
+
+      - name: Đóng gói thành StudentPlanner.ipa
+        run: |
+          mkdir -p Payload
+          cp -R "build/Build/Products/Release-iphoneos/${SCHEME}.app" Payload/
+          zip -qr StudentPlanner.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: StudentPlanner-ipa
+          path: StudentPlanner.ipa
+          retention-days: 14

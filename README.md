@@ -1,5 +1,7 @@
 # Student Planner
 
+<p align="center"><img src="assets/logo.png" width="120" alt="Student Planner" /></p>
+
 Ứng dụng trợ lý sinh viên viết bằng **React Native (Expo)**: lưu thời khóa biểu, nhắc lịch học, quản lý deadline, ghi chú bài học, Pomodoro và tự tính GPA. Giao diện tiếng Việt, hỗ trợ chế độ sáng/tối, dữ liệu lưu ngay trên thiết bị.
 
 ## Tính năng
@@ -28,11 +30,29 @@
 
 **Ghi chú**
 - Gắn môn học, ghim, tìm kiếm.
-- Checklist việc cần làm và **ảnh đính kèm** (chụp bảng, tài liệu hoặc chọn từ thư viện).
+- Checklist việc cần làm, **ảnh đính kèm** (chụp bảng, tài liệu hoặc chọn từ thư viện) và **tệp đính kèm** (PDF, Word, Excel, slide... tối đa 50 MB mỗi tệp); chạm vào tệp để mở hoặc chia sẻ sang app khác.
+
+**Lịch thi**
+- Mỗi kỳ thi có môn, loại (giữa kỳ / cuối kỳ), ngày giờ, thời lượng, phòng thi, số báo danh, hình thức và danh sách đồ **mang theo** (thẻ sinh viên, máy tính...).
+- Đếm ngược theo từng học kỳ; nhắc tối hôm trước thi (kèm các món chưa chuẩn bị) và trước giờ thi 2 tiếng; tóm tắt buổi sáng có cả kỳ thi trong ngày.
+
+**Trợ lý AI (Google Gemini)**
+- Tóm tắt ghi chú: đoạn tóm tắt, ý chính, từ khóa.
+- Tạo câu hỏi ôn tập (trắc nghiệm và câu hỏi ngắn) và **làm bài chấm điểm**, nhớ điểm cao nhất.
+- Lập kế hoạch ôn thi từ lịch thi và các ghi chú của môn, lưu thành ghi chú có checklist.
+- Dùng khóa API của bạn (có gói miễn phí tại [Google AI Studio](https://aistudio.google.com/apikey)), nhập trong Cài đặt. Khóa lưu mã hóa trên máy, không nằm trong bản sao lưu. Chỉ nội dung bạn chọn gửi đi mới được gửi tới Gemini.
+
+**Điểm danh**
+- Mỗi môn đặt số buổi được vắng tối đa; bấm "Có mặt / Vắng" ngay trên trang Hôm nay hoặc trong chi tiết tiết học (xem lại 6 buổi gần nhất).
+- Đồng hồ buổi vắng đổi màu xanh → vàng → đỏ, và gửi thông báo khi còn 1 buổi hoặc đã chạm giới hạn.
 
 **Pomodoro**
 - Tập trung, nghỉ ngắn, nghỉ dài; thời lượng tùy chỉnh; báo khi hết giờ kể cả lúc app chạy nền.
-- Thống kê số phiên và phút tập trung 7 ngày gần nhất.
+- Ghi nhận thời gian học **theo từng môn**, thống kê 7 ngày và **chuỗi ngày học liên tiếp**.
+
+**Tổng kết tuần**
+- Thời gian tập trung theo ngày, so với tuần trước (±%), số phiên, số ngày có học.
+- Deadline đến hạn trong tuần đã hoàn thành bao nhiêu, thời gian học theo môn, số buổi vắng; xem lại được các tuần trước.
 
 **Thông báo**
 - Nhắc giờ học, hạn nộp và **tóm tắt buổi sáng** ("Hôm nay có 3 tiết, 2 deadline...") với giờ gửi tùy chỉnh.
@@ -49,6 +69,7 @@
 | Điều hướng | React Navigation (bottom tabs + native stack) |
 | Trạng thái & lưu trữ | Zustand + `persist` trên AsyncStorage |
 | Thông báo | `expo-notifications` |
+| AI | Google Gemini API (gọi trực tiếp REST), khóa lưu bằng `expo-secure-store` |
 | Ảnh | `expo-image-picker`, `expo-file-system` |
 | Giao diện | `@expo/vector-icons` (Ionicons), `react-native-svg`, `@react-native-community/datetimepicker` |
 
@@ -79,7 +100,8 @@ npx expo-doctor          # kiểm tra cấu hình và phiên bản thư viện
 - **Thông báo hẹn giờ** hoạt động đầy đủ trên thiết bị thật; trên Android, Expo Go bị hạn chế nên cần build bản cài đặt (development build hoặc APK) để dùng ổn định.
 - **Camera và thư viện ảnh** cần chạy trên điện thoại thật. Trên bản web, ảnh được lưu dạng nhúng nên không bền bằng trên điện thoại.
 - Date picker không chạy trên bản web.
-- Dữ liệu chỉ nằm trên thiết bị. Hãy dùng **Cài đặt → Dữ liệu → Xuất bản sao lưu** để chuyển sang máy khác hoặc phòng khi mất máy.
+- Dữ liệu chỉ nằm trên thiết bị. **Bản sao lưu hiện chỉ gồm dữ liệu dạng chữ, chưa gồm ảnh và tệp đính kèm** — chuyển sang máy khác thì ghi chú còn nhưng ảnh và tệp sẽ mất.
+- Trên bản web, tệp đính kèm tối đa 1,5 MB và lưu trong bộ nhớ trình duyệt.
 
 ## Cấu trúc thư mục
 
@@ -91,20 +113,23 @@ src/
   utils.ts                   Hằng số, định dạng thời gian, công thức điểm / GPA
   notifications.ts           Hẹn và hủy thông báo
   summary.ts                 Tóm tắt buổi sáng và bộ lên lịch tự động
-  images.ts                  Chụp / chọn ảnh và lưu bền trên máy
+  ai.ts                      Trợ lý AI (Gemini): khóa API, tóm tắt, câu hỏi ôn tập, kế hoạch ôn thi
+  images.ts                  Chụp / chọn ảnh, chọn / mở tệp đính kèm và lưu bền trên máy
+  dialog.ts                  Hộp thoại dùng chung cho điện thoại và web
   ui.tsx                     Bảng màu và các thành phần giao diện dùng chung
   DateTimeField.tsx          Ô chọn ngày giờ
   ImageViewer.tsx            Xem ảnh toàn màn hình
   screens/
     TodayScreen, ScheduleScreen, DeadlineScreen, NotesScreen, PomodoroScreen
-    CalendarScreen, SubjectListScreen, SemesterListScreen, SettingsScreen
+    CalendarScreen, WeeklyReviewScreen, ExamListScreen, QuizScreen, SubjectListScreen, SemesterListScreen, SettingsScreen
     forms/                   Thêm / sửa môn học, tiết học, deadline, ghi chú, học kỳ, hồ sơ
     details/                 Chi tiết môn học, tiết học, deadline, ghi chú
 ```
 
 ## Hướng phát triển
 
-- Điểm danh và giới hạn số buổi vắng theo môn.
+- Widget màn hình chính hiện tiết sắp tới (cần build bản cài đặt riêng).
+- Nhập thời khóa biểu hàng loạt từ cổng sinh viên (có bảng quy đổi tiết sang giờ).
 - Nhập thời khóa biểu hàng loạt (CSV) và xuất lịch `.ics`.
 - Việc con trong deadline, deadline lặp lại.
 - Đồng bộ đám mây giữa nhiều thiết bị.

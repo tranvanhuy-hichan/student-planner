@@ -1,14 +1,21 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useLayoutEffect, useState } from 'react';
-import { Image, Pressable, ScrollView, Share, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, Share, Text, View } from 'react-native';
+import { describeAiError, makeQuiz, summarizeNote, useAiKey } from '../../ai';
+import { showAlert } from '../../dialog';
+import { openFile } from '../../images';
 import { ImageViewer } from '../../ImageViewer';
 import { useStore } from '../../store';
-import { Button, confirm, Header, Icon, IconButton, InfoRow, Section, useColors, useS } from '../../ui';
+import { fileIcon, fmtSize } from '../../utils';
+import { Button, Chip, Chips, confirm, Header, Icon, IconButton, InfoRow, ListRow, Pill, Section, useColors, useS } from '../../ui';
 
 export default function NoteDetail() {
   const { id } = useRoute().params as { id: string };
   const nav = useNavigation<any>();
-  const { notes, subjects, togglePin, toggleNoteItem, removeNote } = useStore();
+  const { notes, subjects, togglePin, toggleNoteItem, removeNote, setNoteAi } = useStore();
+  const hasKey = !!useAiKey((st) => st.key);
+  const [busy, setBusy] = useState<'summary' | 'quiz' | null>(null);
+  const [count, setCount] = useState(8);
   const s = useS();
   const c = useColors();
   const [viewer, setViewer] = useState<number | null>(null);
@@ -27,6 +34,20 @@ export default function NoteDetail() {
   }, [nav, id, c, n?.pinned]);
 
   if (!n) return null;
+
+  const run = async (kind: 'summary' | 'quiz') => {
+    setBusy(kind);
+    try {
+      if (kind === 'summary') setNoteAi(n.id, { summary: await summarizeNote(n, sub?.name) });
+      else setNoteAi(n.id, { quiz: await makeQuiz(n, count, sub?.name) });
+    } catch (err) {
+      showAlert('Trợ lý AI chưa thực hiện được', describeAiError(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+  const ai = n.ai;
+  const when = (iso: string) => new Date(iso).toLocaleDateString('vi-VN', { day: 'numeric', month: 'numeric' });
   const doneCount = n.checklist.filter((i) => i.done).length;
   const text = [n.title, n.body, ...n.checklist.map((i) => `${i.done ? '☑' : '☐'} ${i.text}`)].filter(Boolean).join('\n\n');
 
@@ -70,7 +91,79 @@ export default function NoteDetail() {
         </>
       )}
 
-      {!n.body && n.checklist.length === 0 && n.images.length === 0 && <Text style={[s.sub, { marginTop: 18 }]}>Ghi chú chưa có nội dung.</Text>}
+      {/* Trợ lý AI */}
+      <Section text="Trợ lý AI" />
+      {!hasKey ? (
+        <>
+          <Text style={[s.sub, { marginBottom: 8 }]}>Tóm tắt ghi chú và tạo câu hỏi ôn tập bằng Gemini. Có gói miễn phí.</Text>
+          <Button icon="key-outline" title="Thêm khóa API trong Cài đặt" color={c.muted} onPress={() => nav.navigate('Cài đặt')} />
+        </>
+      ) : (
+        <>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flex: 1 }}><Button icon="sparkles-outline" title={busy === 'summary' ? 'Đang tóm tắt...' : ai?.summary ? 'Tóm tắt lại' : 'Tóm tắt'} color={c.muted} onPress={busy ? () => {} : () => run('summary')} /></View>
+            <View style={{ flex: 1 }}><Button icon="help-circle-outline" title={busy === 'quiz' ? 'Đang tạo...' : 'Tạo câu hỏi'} color={c.muted} onPress={busy ? () => {} : () => run('quiz')} /></View>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={[s.sub, { marginTop: 0, marginBottom: 6 }]}>Số câu hỏi:</Text>
+            <Chips>{[5, 8, 12].map((k) => <Chip key={k} label={String(k)} active={count === k} onPress={() => setCount(k)} />)}</Chips>
+            {busy && <ActivityIndicator color={c.primary} style={{ marginBottom: 6 }} />}
+          </View>
+        </>
+      )}
+
+      {ai?.summary && (
+        <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: c.border }}>
+          <View style={[s.row, { marginBottom: 6 }]}>
+            <Text style={s.kicker}>Tóm tắt</Text>
+            <Text style={[s.sub, { fontSize: 11 }]}>{when(ai.summary.at)} · {ai.summary.model}</Text>
+          </View>
+          <Text style={{ color: c.text, lineHeight: 23, fontSize: 15 }} selectable>{ai.summary.text}</Text>
+          {ai.summary.points.map((p, k) => (
+            <View key={k} style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+              <Text style={{ color: c.primary, fontWeight: '800' }}>•</Text>
+              <Text style={{ flex: 1, color: c.text, lineHeight: 21 }} selectable>{p}</Text>
+            </View>
+          ))}
+          {ai.summary.keywords.length > 0 && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
+              {ai.summary.keywords.map((k) => <Pill key={k} text={k} color={c.primary} />)}
+            </View>
+          )}
+        </View>
+      )}
+
+      {ai?.quiz && (
+        <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: c.border }}>
+          <View style={[s.row, { marginBottom: 6 }]}>
+            <Text style={s.kicker}>Câu hỏi ôn tập</Text>
+            <Text style={[s.sub, { fontSize: 11 }]}>{when(ai.quiz.at)} · {ai.quiz.model}</Text>
+          </View>
+          <Text style={{ color: c.text, fontWeight: '700', marginBottom: 8 }}>
+            {ai.quiz.questions.length} câu{ai.quiz.best ? ` · điểm cao nhất ${ai.quiz.best.correct}/${ai.quiz.best.total}` : ' · chưa làm bài'}
+          </Text>
+          <Button icon="play" title="Làm bài ôn tập" onPress={() => nav.navigate('Quiz', { noteId: n.id })} />
+        </View>
+      )}
+
+      {n.files.length > 0 && (
+        <>
+          <Section text={`Tệp đính kèm · ${n.files.length}`} />
+          {n.files.map((f, i) => (
+            <ListRow key={f.id} last={i === n.files.length - 1} onPress={() => openFile(f).catch(() => showAlert('Không mở được tệp', 'Máy của bạn chưa hỗ trợ chia sẻ hoặc mở tệp này.'))}>
+              <Icon name={fileIcon(f.name, f.mime)} size={24} color={c.primary} />
+              <View style={{ flex: 1, minWidth: 0, marginLeft: 14 }}>
+                <Text numberOfLines={2} style={s.title}>{f.name}</Text>
+                {!!f.size && <Text style={s.sub}>{fmtSize(f.size)}</Text>}
+              </View>
+              <Icon name="open-outline" size={20} color={c.muted} />
+            </ListRow>
+          ))}
+          <Text style={[s.sub, { marginTop: 4 }]}>Chạm vào tệp để mở hoặc chia sẻ sang ứng dụng khác.</Text>
+        </>
+      )}
+
+      {!n.body && n.checklist.length === 0 && n.images.length === 0 && n.files.length === 0 && <Text style={[s.sub, { marginTop: 18 }]}>Ghi chú chưa có nội dung.</Text>}
 
       <View style={{ height: 20 }} />
       <Button icon="create-outline" title="Chỉnh sửa ghi chú" onPress={() => nav.navigate('NoteForm', { id })} />

@@ -34,6 +34,18 @@ export type Subject = {
   teacher: string;
   credits: number;
   grades: GradeColumn[];
+  maxAbsent?: number; // số buổi được vắng tối đa; 0 hoặc trống = không theo dõi điểm danh
+};
+
+export type AttendanceStatus = 'present' | 'absent';
+
+/** Một buổi học đã điểm danh (mỗi tiết học mỗi ngày tối đa một bản ghi) */
+export type Attendance = {
+  id: string;
+  subjectId: string;
+  classId: string;
+  date: string; // YYYY-MM-DD
+  status: AttendanceStatus;
 };
 
 export type ClassItem = {
@@ -64,6 +76,9 @@ export type Deadline = {
 
 export type ChecklistItem = { id: string; text: string; done: boolean };
 
+/** Tệp đính kèm trong ghi chú (PDF, tài liệu...) đã được sao chép vào bộ nhớ của app */
+export type NoteFile = { id: string; name: string; uri: string; size?: number; mime?: string };
+
 export type Note = {
   id: string;
   semesterId: string;
@@ -71,6 +86,8 @@ export type Note = {
   body: string;
   checklist: ChecklistItem[];
   images: string[]; // đường dẫn ảnh đã lưu trên máy
+  files: NoteFile[];
+  ai?: AiNote;
   subjectId?: string;
   pinned: boolean;
   updatedAt: string;
@@ -87,6 +104,40 @@ export type Settings = {
   longEvery: number;
   morningSummary: boolean;
   morningTime: string; // HH:MM
+  aiModel: string; // mô hình Gemini dùng cho trợ lý AI
 };
 
-export type FocusDay = { sessions: number; minutes: number };
+export type ExamKind = 'midterm' | 'final' | 'other';
+
+export type Exam = {
+  id: string;
+  semesterId: string;
+  subjectId?: string;
+  kind: ExamKind;
+  title: string; // tên tuỳ chọn; để trống thì hiển thị "Môn · Giữa kỳ"
+  date: string; // ISO, giờ bắt đầu thi
+  durationMin: number;
+  room: string;
+  seatNumber: string; // số báo danh
+  format: string; // trắc nghiệm, tự luận...
+  checklist: ChecklistItem[]; // đồ cần mang theo
+  notes: string;
+  notifIds?: string[];
+};
+
+/** Câu hỏi ôn tập do AI tạo. Trắc nghiệm: 4 phương án + answerIndex; câu hỏi ngắn: options rỗng, answerIndex = -1 */
+export type QuizQuestion = {
+  type: 'mcq' | 'short';
+  question: string;
+  options: string[];
+  answerIndex: number;
+  answer: string;
+  explanation: string;
+};
+
+export type AiNote = {
+  summary?: { text: string; points: string[]; keywords: string[]; model: string; at: string };
+  quiz?: { questions: QuizQuestion[]; model: string; at: string; best?: { correct: number; total: number } };
+};
+
+export type FocusDay = { sessions: number; minutes: number; bySubject?: Record<string, number> }; // key '_' = chưa gắn môn

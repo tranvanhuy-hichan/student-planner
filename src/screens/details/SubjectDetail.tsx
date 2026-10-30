@@ -5,7 +5,7 @@ import { ScrollView, Text, TextInput, View } from 'react-native';
 import { useStore } from '../../store';
 import type { GradeColumn } from '../../types';
 import { DAYS, letter, neededAverage, PRIORITIES, subjectResult, timeLeft, to4 } from '../../utils';
-import { Button, confirm, Empty, Header, Icon, IconButton, ListRow, Pill, Section, useColors, useS } from '../../ui';
+import { AbsentMeter, Button, confirm, Empty, Header, Icon, IconButton, ListRow, Pill, Section, useColors, useS } from '../../ui';
 
 /** Ô nhập điểm của một cột; lưu khi rời khỏi ô, để trống = chưa có điểm */
 function ScoreInput({ value, onCommit }: { value?: number; onCommit: (v: number | undefined) => void }) {
@@ -37,7 +37,7 @@ function ScoreInput({ value, onCommit }: { value?: number; onCommit: (v: number 
 export default function SubjectDetail() {
   const { id } = useRoute().params as { id: string };
   const nav = useNavigation<any>();
-  const { subjects, classes, deadlines, notes, removeSubject, updateSubject } = useStore();
+  const { subjects, classes, deadlines, notes, attendance, removeSubject, updateSubject } = useStore();
   const s = useS();
   const c = useColors();
   const sub = subjects.find((x) => x.id === id);
@@ -50,6 +50,8 @@ export default function SubjectDetail() {
   const myClasses = classes.filter((x) => x.subjectId === id).sort((a, b) => DAYS.findIndex((d) => d.v === a.weekday) - DAYS.findIndex((d) => d.v === b.weekday) || a.start.localeCompare(b.start));
   const myDeadlines = deadlines.filter((x) => x.subjectId === id && !x.done).sort((a, b) => a.due.localeCompare(b.due));
   const myNotes = notes.filter((x) => x.subjectId === id);
+  const absentCount = attendance.filter((a) => a.subjectId === id && a.status === 'absent').length;
+  const presentCount = attendance.filter((a) => a.subjectId === id && a.status === 'present').length;
   const res = subjectResult(sub);
   const totalW = sub.grades.reduce((a, g) => a + g.weight, 0);
   const setScore = (gid: string, v: number | undefined) =>
@@ -98,6 +100,16 @@ export default function SubjectDetail() {
           )}
           <Button icon="create-outline" title="Sửa cột điểm" color={c.muted} onPress={() => nav.navigate('SubjectForm', { id })} />
         </>
+      )}
+
+      <Section text="Điểm danh" />
+      {(sub.maxAbsent ?? 0) > 0 ? (
+        <>
+          <AbsentMeter absent={absentCount} max={sub.maxAbsent!} />
+          <Text style={s.sub}>Có mặt {presentCount} buổi · Vắng {absentCount} buổi · Chạm vào tiết học bên dưới để điểm danh</Text>
+        </>
+      ) : (
+        <Empty icon="person-remove-outline" text="Chưa theo dõi số buổi vắng của môn này" action={{ label: 'Đặt giới hạn buổi vắng', onPress: () => nav.navigate('SubjectForm', { id }) }} />
       )}
 
       <Section text={`Lịch học · ${myClasses.length}`} />

@@ -23,6 +23,12 @@ import DeadlineForm from './src/screens/forms/DeadlineForm';
 import NoteForm from './src/screens/forms/NoteForm';
 import SubjectForm from './src/screens/forms/SubjectForm';
 import SemesterListScreen from './src/screens/SemesterListScreen';
+import WeeklyReviewScreen from './src/screens/WeeklyReviewScreen';
+import ExamListScreen from './src/screens/ExamListScreen';
+import QuizScreen from './src/screens/QuizScreen';
+import ExamDetail from './src/screens/details/ExamDetail';
+import ExamForm from './src/screens/forms/ExamForm';
+import { loadApiKey } from './src/ai';
 import ProfileForm from './src/screens/forms/ProfileForm';
 import SemesterForm from './src/screens/forms/SemesterForm';
 import { profileComplete, useStore } from './src/store';
@@ -87,6 +93,7 @@ export default function App() {
 
   // Hẹn thông báo tóm tắt buổi sáng và tự hẹn lại khi dữ liệu đổi
   useEffect(() => startSummaryScheduler(), []);
+  useEffect(() => { loadApiKey(); }, []);
 
   // Mở app mà chưa lưu hồ sơ (trường, lớp) thì nhắc điền, mỗi lần mở app một lần
   useEffect(() => {
@@ -105,7 +112,12 @@ export default function App() {
           <Stack.Screen name="Main" component={Tabs} options={{ headerShown: false }} />
           <Stack.Screen name="Lịch" component={CalendarScreen} options={{ title: 'Lịch tháng' }} />
           <Stack.Screen name="Cài đặt" component={SettingsScreen} />
- <Stack.Screen name="SemesterList" component={SemesterListScreen} options={{ title: 'Học kỳ' }} />
+ <Stack.Screen name="ExamList" component={ExamListScreen} options={{ title: 'Lịch thi' }} />
+          <Stack.Screen name="ExamDetail" component={ExamDetail} options={{ title: 'Chi tiết kỳ thi' }} />
+          <Stack.Screen name="ExamForm" component={ExamForm} options={form('kỳ thi')} />
+          <Stack.Screen name="Quiz" component={QuizScreen} options={{ title: 'Ôn tập' }} />
+          <Stack.Screen name="WeeklyReview" component={WeeklyReviewScreen} options={{ title: 'Tổng kết tuần' }} />
+          <Stack.Screen name="SemesterList" component={SemesterListScreen} options={{ title: 'Học kỳ' }} />
           <Stack.Screen name="SemesterForm" component={SemesterForm} options={form('học kỳ')} />
           <Stack.Screen name="Profile" component={ProfileForm} options={{ title: 'Hồ sơ sinh viên', presentation: 'modal' }} />
           <Stack.Screen name="SubjectList" component={SubjectListScreen} options={{ title: 'Môn học & GPA' }} />

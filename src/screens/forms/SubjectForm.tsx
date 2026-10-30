@@ -1,6 +1,7 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
+import { showAlert } from '../../dialog';
 import { useStore } from '../../store';
 import type { GradeColumn } from '../../types';
 import { GRADE_TEMPLATES, letter, subjectResult, SUBJECT_COLORS, to4 } from '../../utils';
@@ -22,6 +23,7 @@ export default function SubjectForm() {
   const [name, setName] = useState(old?.name ?? '');
   const [teacher, setTeacher] = useState(old?.teacher ?? '');
   const [credits, setCredits] = useState(old?.credits ?? 3);
+  const [maxAbsent, setMaxAbsent] = useState(old?.maxAbsent ?? 0);
   const [color, setColor] = useState(old?.color ?? SUBJECT_COLORS[(subjects.length + 5) % SUBJECT_COLORS.length]);
   const [rows, setRows] = useState<Row[]>((old?.grades ?? []).map(toRow));
   const [error, setError] = useState('');
@@ -30,7 +32,7 @@ export default function SubjectForm() {
 
   const applyTemplate = (cols: { name: string; weight: number }[]) => {
     const apply = () => setRows(cols.map((x) => ({ id: rid(), name: x.name, weight: String(x.weight), score: '' })));
-    if (rows.some((r) => r.score.trim())) Alert.alert('Thay các cột điểm hiện tại?', 'Các điểm đã nhập sẽ bị xóa.', [{ text: 'Hủy', style: 'cancel' }, { text: 'Thay', style: 'destructive', onPress: apply }]);
+    if (rows.some((r) => r.score.trim())) showAlert('Thay các cột điểm hiện tại?', 'Các điểm đã nhập sẽ bị xóa.', [{ text: 'Hủy', style: 'cancel' }, { text: 'Thay', style: 'destructive', onPress: apply }]);
     else apply();
   };
 
@@ -59,7 +61,7 @@ export default function SubjectForm() {
     if (!name.trim()) return setError('Vui lòng nhập tên môn học');
     const grades = parse(true);
     if (typeof grades === 'string') return setError(grades);
-    const data = { name: name.trim(), teacher: teacher.trim(), credits, color, grades };
+    const data = { name: name.trim(), teacher: teacher.trim(), credits, color, grades, maxAbsent };
     if (id) await updateSubject(id, data);
     else addSubject(data);
     nav.goBack();
@@ -92,6 +94,15 @@ export default function SubjectForm() {
           <IconButton name="remove-circle-outline" size={30} color={c.text} onPress={() => setCredits(Math.max(0, credits - 1))} />
           <Text style={{ color: c.text, fontSize: 24, fontWeight: '800', minWidth: 28, textAlign: 'center', fontVariant: ['tabular-nums'] }}>{credits}</Text>
           <IconButton name="add-circle-outline" size={30} color={c.text} onPress={() => setCredits(Math.min(20, credits + 1))} />
+        </View>
+      </FormCard>
+
+      <FormCard icon="person-remove" title="Số buổi được vắng tối đa">
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          <IconButton name="remove-circle-outline" size={30} color={c.text} onPress={() => setMaxAbsent(Math.max(0, maxAbsent - 1))} />
+          <Text style={{ color: c.text, fontSize: 24, fontWeight: '800', minWidth: 28, textAlign: 'center', fontVariant: ['tabular-nums'] }}>{maxAbsent}</Text>
+          <IconButton name="add-circle-outline" size={30} color={c.text} onPress={() => setMaxAbsent(Math.min(30, maxAbsent + 1))} />
+          <Text style={[s.sub, { flex: 1, marginTop: 0 }]}>{maxAbsent === 0 ? 'Đặt 0 nếu không theo dõi điểm danh.' : 'App cảnh báo khi sắp chạm giới hạn.'}</Text>
         </View>
       </FormCard>
 

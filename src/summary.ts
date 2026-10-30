@@ -18,12 +18,19 @@ export function buildSummary(date: Date): { title: string; body: string } | unde
   const due = open.filter((d) => { const t = new Date(d.due).getTime(); return t >= from && t < from + 86400_000; }).sort((a, b) => a.due.localeCompare(b.due));
   const isToday = new Date().toDateString() === date.toDateString();
   const overdue = isToday ? open.filter((d) => new Date(d.due).getTime() < from).length : 0;
-  if (!classes.length && !due.length && !overdue) return;
+  const exams = st.exams.filter((x) => x.semesterId === sem.id && new Date(x.date).toDateString() === date.toDateString()).sort((a, b) => a.date.localeCompare(b.date));
+  if (!classes.length && !due.length && !overdue && !exams.length) return;
 
   const parts: string[] = [];
+  if (exams.length) parts.push(`${exams.length} kỳ thi`);
   if (classes.length) parts.push(`${classes.length} tiết`);
   if (due.length) parts.push(`${due.length} deadline`);
   const lines: string[] = [];
+  if (exams.length) {
+    const e = exams[0];
+    const t = new Date(e.date);
+    lines.push(`Thi ${e.title.trim() || subs.get(e.subjectId ?? '')?.name || 'kỳ thi'} lúc ${pad(t.getHours())}:${pad(t.getMinutes())}${e.room ? ` · phòng ${e.room}` : ''}${e.seatNumber ? ` · SBD ${e.seatNumber}` : ''}`);
+  }
   if (classes.length) {
     const c = classes[0];
     lines.push(`Tiết đầu ${c.start} · ${subs.get(c.subjectId)?.name ?? 'Môn học'}${c.room ? ` · ${c.room}` : ''}`);

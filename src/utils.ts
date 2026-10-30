@@ -1,4 +1,4 @@
-import type { DeadlineType, GradeColumn, IconName, Priority, Subject } from './types';
+import type { DeadlineType, Exam, ExamKind, GradeColumn, IconName, Priority, Subject } from './types';
 
 export const DAYS = [
   { label: 'T2', full: 'Thứ hai', v: 2 },
@@ -124,4 +124,78 @@ export function neededAverage(cols: GradeColumn[], target: number): number | und
   if (!empty.length || !rw) return undefined;
   const got = cols.filter((g) => g.score !== undefined).reduce((a, g) => a + g.score! * g.weight, 0);
   return (target * totalW - got) / rw;
+}
+
+
+/** Thứ hai đầu tuần của ngày `d`, lùi/tiến `offsetWeeks` tuần */
+export function weekStart(d = new Date(), offsetWeeks = 0): Date {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7) + offsetWeeks * 7);
+  return x;
+}
+
+/** Chuỗi ngày liên tiếp có tập trung. Nếu hôm nay chưa học thì chuỗi vẫn tính đến hôm qua, tránh "mất chuỗi" giữa ngày */
+export function focusStreak(focus: Record<string, { minutes: number }>) {
+  const has = (d: Date) => (focus[dayKey(d)]?.minutes ?? 0) > 0;
+  const d = new Date();
+  if (!has(d)) d.setDate(d.getDate() - 1);
+  let current = 0;
+  while (has(d)) { current++; d.setDate(d.getDate() - 1); }
+
+  const days = Object.keys(focus).filter((k) => focus[k].minutes > 0).sort();
+  let best = 0, run = 0, prev: number | undefined;
+  for (const k of days) {
+    const [y, m, dd] = k.split('-').map(Number);
+    const ts = new Date(y, m - 1, dd).getTime();
+    run = prev !== undefined && Math.round((ts - prev) / 86400_000) === 1 ? run + 1 : 1;
+    best = Math.max(best, run);
+    prev = ts;
+  }
+  return { current, best };
+}
+
+/** "5 giờ 20 phút" / "45 phút" */
+export const fmtMinutes = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} giờ${m % 60 ? ` ${m % 60} phút` : ''}` : `${m} phút`);
+
+
+/** "850 KB", "2,4 MB" */
+export function fmtSize(bytes?: number): string {
+  if (!bytes) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1).replace('.', ',')} MB`;
+}
+
+/** Icon theo loại tệp (dựa vào đuôi file, rồi tới mime) */
+export function fileIcon(name: string, mime?: string): IconName {
+  const ext = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1).toLowerCase() : '';
+  if (ext === 'pdf' || mime === 'application/pdf') return 'document-text';
+  if (['doc', 'docx', 'txt', 'rtf', 'odt', 'md'].includes(ext)) return 'document-text';
+  if (['xls', 'xlsx', 'csv', 'ods'].includes(ext)) return 'grid';
+  if (['ppt', 'pptx', 'odp'].includes(ext)) return 'easel';
+  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return 'archive';
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'heic'].includes(ext) || mime?.startsWith('image/')) return 'image';
+  if (['mp3', 'wav', 'm4a', 'aac'].includes(ext) || mime?.startsWith('audio/')) return 'musical-notes';
+  if (['mp4', 'mov', 'mkv', 'avi'].includes(ext) || mime?.startsWith('video/')) return 'videocam';
+  return 'document';
+}
+
+
+export const EXAM_KINDS: Record<ExamKind, string> = { midterm: 'Giữa kỳ', final: 'Cuối kỳ', other: 'Khác' };
+export const EXAM_FORMATS = ['Trắc nghiệm', 'Tự luận', 'Vấn đáp', 'Thực hành'];
+export const EXAM_DURATIONS = [45, 60, 90, 120, 150, 180];
+/** Đồ dùng mang theo mặc định khi tạo kỳ thi mới */
+export const DEFAULT_EXAM_ITEMS = ['Thẻ sinh viên', 'CCCD / giấy tờ tùy thân', 'Bút (xanh / đen)', 'Máy tính cầm tay', 'Nước uống'];
+
+export const examName = (e: Pick<Exam, 'title' | 'kind' | 'subjectId'>, subjects: Pick<Subject, 'id' | 'name'>[]) =>
+  e.title.trim() || `${subjects.find((s) => s.id === e.subjectId)?.name ?? 'Kỳ thi'} · ${EXAM_KINDS[e.kind]}`;
+
+/** "5 ngày 3 giờ" / "3 giờ 20 phút" / "20 phút" / "Đang thi" cho khoảng thời gian tới giờ thi */
+export function fmtCountdown(ms: number, durationMin = 0): string {
+  if (ms <= 0) return ms > -durationMin * 60000 ? 'Đang diễn ra' : 'Đã thi';
+  const min = Math.floor(ms / 60000);
+  const d = Math.floor(min / 1440), h = Math.floor((min % 1440) / 60), m = min % 60;
+  if (d > 0) return `${d} ngày${h ? ` ${h} giờ` : ''}`;
+  if (h > 0) return `${h} giờ${m ? ` ${m} phút` : ''}`;
+  return `${Math.max(m, 1)} phút`;
 }

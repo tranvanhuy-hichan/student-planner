@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, Share, Switch, Text, View } from 'react-native';
+import Constants from 'expo-constants';
+import { ActivityIndicator, Image, Linking, Pressable, ScrollView, Share, Switch, Text, View } from 'react-native';
+import { AI_MODELS, clearApiKey, describeAiError, maskKey, saveApiKey, testConnection, useAiKey } from '../ai';
+import { showAlert } from '../dialog';
 import { useNavigation } from '@react-navigation/native';
 import { DateTimeField } from '../DateTimeField';
 import { sendTestSummary } from '../summary';
@@ -67,6 +70,11 @@ export default function SettingsScreen() {
   const c = useColors();
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState('');
+  const aiKey = useAiKey((st) => st.key);
+  const [showKey, setShowKey] = useState(false);
+  const [keyText, setKeyText] = useState('');
+  const [reveal, setReveal] = useState(false);
+  const [testing, setTesting] = useState(false);
   const off = !settings.notifications;
 
   const resetPomodoro = () =>
@@ -74,6 +82,14 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.pad} keyboardShouldPersistTaps="handled">
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 22 }}>
+        <Image source={require('../../assets/logo.png')} style={{ width: 56, height: 56 }} resizeMode="contain" />
+        <View>
+          <Text style={{ fontSize: 20, fontWeight: '800', color: c.text, letterSpacing: -0.4 }}>Student Planner</Text>
+          <Text style={s.sub}>Phiên bản {Constants.expoConfig?.version ?? '1.0.0'}</Text>
+        </View>
+      </View>
+
       <Group title="Hồ sơ & học kỳ">
         <Row
           icon="person-circle-outline"
@@ -158,6 +174,61 @@ export default function SettingsScreen() {
         <Row icon="refresh-outline" label="Khôi phục mặc định" last onPress={resetPomodoro} />
       </Group>
 
+      <Group title="Trợ lý AI (Gemini)">
+        <Row
+          icon="key-outline"
+          label="Khóa API Gemini"
+          hint={aiKey ? `Đã lưu · ${maskKey(aiKey)}` : 'Chưa có khóa — bấm để thêm'}
+          onPress={() => setShowKey((v) => !v)}
+          right={<Icon name={showKey ? 'chevron-up' : 'chevron-down'} size={18} color={c.muted} />}
+        />
+        {showKey && (
+          <View style={{ padding: 14, paddingTop: 4, borderBottomWidth: 1, borderBottomColor: c.border }}>
+            <Input icon="key-outline" placeholder="Dán khóa API (bắt đầu bằng AIza...)" value={keyText} onChangeText={setKeyText} secureTextEntry={!reveal} autoCapitalize="none" autoCorrect={false}
+              containerStyle={{ marginBottom: 8 }} />
+            <Pressable onPress={() => setReveal((v) => !v)} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+              <Icon name={reveal ? 'eye-off-outline' : 'eye-outline'} size={16} color={c.muted} />
+              <Text style={{ color: c.muted, fontSize: 13 }}>{reveal ? 'Ẩn khóa' : 'Hiện khóa'}</Text>
+            </Pressable>
+            <Button icon="checkmark" title="Lưu khóa" onPress={async () => {
+              if (keyText.trim().length < 20) return showAlert('Khóa chưa hợp lệ', 'Hãy dán đầy đủ khóa API từ Google AI Studio.');
+              await saveApiKey(keyText);
+              setKeyText(''); setReveal(false); setShowKey(false);
+              showAlert('Đã lưu khóa API', 'Bấm "Kiểm tra kết nối" để chắc chắn khóa hoạt động.');
+            }} />
+            {!!aiKey && <Button icon="trash-outline" title="Xóa khóa" color={c.danger} onPress={() => confirm('Xóa khóa API khỏi máy này?', clearApiKey)} />}
+            <Pressable onPress={() => Linking.openURL('https://aistudio.google.com/apikey')} hitSlop={8}>
+              <Text style={{ color: c.primary, fontWeight: '700', fontSize: 13 }}>Lấy khóa miễn phí tại aistudio.google.com/apikey</Text>
+            </Pressable>
+            <Text style={[s.sub, { marginTop: 6 }]}>Khóa được lưu mã hóa trên máy bạn và không nằm trong bản sao lưu.</Text>
+          </View>
+        )}
+        <View style={{ padding: 14, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: c.border }}>
+          <Text style={{ color: c.text, fontSize: 15, fontWeight: '600', marginBottom: 10 }}>Mô hình</Text>
+          <Segmented<string>
+            value={AI_MODELS.some((m) => m.id === settings.aiModel) ? settings.aiModel : ''}
+            onChange={(k) => setSettings({ aiModel: k })}
+            options={AI_MODELS.map((m) => ({ key: m.id, label: m.label }))}
+          />
+          <Text style={[s.sub, { marginTop: -2, marginBottom: 10 }]}>{AI_MODELS.find((m) => m.id === settings.aiModel)?.hint ?? `Mô hình tùy chọn: ${settings.aiModel}`}</Text>
+          <Input icon="hardware-chip-outline" placeholder="Hoặc nhập tên mô hình khác" value={settings.aiModel} onChangeText={(v) => setSettings({ aiModel: v.trim() })} autoCapitalize="none" autoCorrect={false} />
+        </View>
+        <Row
+          icon="pulse-outline"
+          label="Kiểm tra kết nối"
+          hint="Gửi một yêu cầu rất nhỏ để thử khóa và mô hình"
+          dim={!aiKey}
+          onPress={!aiKey || testing ? undefined : async () => {
+            setTesting(true);
+            try { await testConnection(aiKey, settings.aiModel); showAlert('Kết nối thành công', `Khóa hoạt động với mô hình ${settings.aiModel}.`); }
+            catch (err) { showAlert('Chưa kết nối được', describeAiError(err)); }
+            finally { setTesting(false); }
+          }}
+          right={testing ? <ActivityIndicator color={c.primary} /> : undefined}
+        />
+        <Row icon="shield-checkmark-outline" last label="Quyền riêng tư" hint="Chỉ khi bạn bấm tóm tắt / tạo câu hỏi / lập kế hoạch, nội dung ghi chú đó mới được gửi tới Google Gemini." />
+      </Group>
+
       <Group title="Dữ liệu">
         <Row
           icon="albums-outline"
@@ -176,8 +247,8 @@ export default function SettingsScreen() {
               onPress={() =>
                 confirm('Thay thế toàn bộ dữ liệu hiện tại?', async () => {
                   const err = await importData(importText.trim());
-                  if (err) Alert.alert('Không khôi phục được', err);
-                  else { setImportText(''); setShowImport(false); Alert.alert('Đã khôi phục dữ liệu'); }
+                  if (err) showAlert('Không khôi phục được', err);
+                  else { setImportText(''); setShowImport(false); showAlert('Đã khôi phục dữ liệu'); }
                 }, 'Khôi phục')
               }
             />

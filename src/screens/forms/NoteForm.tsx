@@ -1,10 +1,12 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { deleteImage, pickImage } from '../../images';
+import { Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { showAlert } from '../../dialog';
+import { deleteFile, deleteImage, MAX_FILE_LABEL, pickFile, pickImage } from '../../images';
 import { ImageViewer } from '../../ImageViewer';
 import { useStore } from '../../store';
-import type { ChecklistItem } from '../../types';
+import type { ChecklistItem, NoteFile } from '../../types';
+import { fileIcon, fmtSize } from '../../utils';
 import { BigInput, Button, ErrorText, FormCard, Icon, IconButton, Input, SubjectPicker, useColors, useS } from '../../ui';
 
 const rid = () => Math.random().toString(36).slice(2, 9);
@@ -23,13 +25,15 @@ export default function NoteForm() {
   const [items, setItems] = useState<ChecklistItem[]>(old?.checklist ?? []);
   const [newItem, setNewItem] = useState('');
   const [images, setImages] = useState<string[]>(old?.images ?? []);
+  const [files, setFiles] = useState<NoteFile[]>(old?.files ?? []);
   const [viewer, setViewer] = useState<number | null>(null);
   const [error, setError] = useState('');
 
   // Ảnh thêm trong lần sửa này mà chưa lưu thì xóa đi khi thoát, tránh để file rác
   const added = useRef<string[]>([]);
+  const addedFiles = useRef<NoteFile[]>([]);
   const saved = useRef(false);
-  useEffect(() => () => { if (!saved.current) added.current.forEach(deleteImage); }, []);
+  useEffect(() => () => { if (!saved.current) { added.current.forEach(deleteImage); addedFiles.current.forEach(deleteFile); } }, []);
 
   const addItem = () => {
     const text = newItem.trim();
@@ -41,10 +45,10 @@ export default function NoteForm() {
   const addImage = async (source: 'camera' | 'library') => {
     try {
       const r = await pickImage(source);
-      if (r.denied) return Alert.alert('Chưa có quyền truy cập', source === 'camera' ? 'Hãy cho phép dùng camera trong cài đặt của điện thoại.' : 'Hãy cho phép truy cập ảnh trong cài đặt của điện thoại.');
+      if (r.denied) return showAlert('Chưa có quyền truy cập', source === 'camera' ? 'Hãy cho phép dùng camera trong cài đặt của điện thoại.' : 'Hãy cho phép truy cập ảnh trong cài đặt của điện thoại.');
       if (r.uri) { added.current.push(r.uri); setImages((x) => [...x, r.uri!]); }
     } catch {
-      Alert.alert('Không thêm được ảnh', 'Vui lòng thử lại.');
+      showAlert('Không thêm được ảnh', 'Vui lòng thử lại.');
     }
   };
 
@@ -53,11 +57,26 @@ export default function NoteForm() {
     setImages((x) => x.filter((u) => u !== uri));
   };
 
+  const addFile = async () => {
+    try {
+      const r = await pickFile();
+      if (r.tooBig) return showAlert('Tệp quá lớn', `Chỉ đính kèm được tệp tối đa ${MAX_FILE_LABEL}.`);
+      if (r.file) { addedFiles.current.push(r.file); setFiles((x) => [...x, r.file!]); }
+    } catch {
+      showAlert('Không thêm được tệp', 'Vui lòng thử lại.');
+    }
+  };
+
+  const removeFile = (f: NoteFile) => {
+    if (addedFiles.current.some((x) => x.id === f.id)) { deleteFile(f); addedFiles.current = addedFiles.current.filter((x) => x.id !== f.id); }
+    setFiles((x) => x.filter((q) => q.id !== f.id));
+  };
+
   const submit = () => {
     if (!title.trim()) return setError('Vui lòng nhập tiêu đề');
     const pending = newItem.trim() ? [...items, { id: rid(), text: newItem.trim(), done: false }] : items; // không bỏ sót dòng đang gõ dở
     saved.current = true;
-    saveNote({ id, title: title.trim(), subjectId, body, checklist: pending, images });
+    saveNote({ id, title: title.trim(), subjectId, body, checklist: pending, images, files });
     nav.goBack();
   };
 
@@ -93,7 +112,12 @@ export default function NoteForm() {
           <View style={{ flex: 1, minWidth: 0 }}>
             <Input icon="add" placeholder="Thêm việc cần làm" value={newItem} onChangeText={setNewItem} onSubmitEditing={addItem} returnKeyType="done" blurOnSubmit={false} style={{ marginBottom: 0 }} />
           </View>
-          <Button icon="add" title="Thêm" onPress={addItem} />
+          <Pressable
+            onPress={addItem}
+            accessibilityLabel="Thêm việc"
+            style={({ pressed }) => ({ width: 46, height: 46, borderRadius: 10, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.8 : newItem.trim() ? 1 : 0.45 })}>
+            <Icon name="add" size={24} color={c.onPrimary} />
+          </Pressable>
         </View>
       </FormCard>
 
@@ -117,6 +141,22 @@ export default function NoteForm() {
           </View>
         )}
         {images.length === 0 && <Text style={s.sub}>Chụp bảng thầy viết hoặc tài liệu để đính kèm vào ghi chú.</Text>}
+      </FormCard>
+
+      <FormCard icon="attach" title={`Tệp đính kèm${files.length ? ` · ${files.length}` : ''}`}>
+        {files.map((f) => (
+          <View key={f.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: c.border }}>
+            <Icon name={fileIcon(f.name, f.mime)} size={22} color={c.primary} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text numberOfLines={1} style={s.title}>{f.name}</Text>
+              {!!f.size && <Text style={s.sub}>{fmtSize(f.size)}</Text>}
+            </View>
+            <IconButton name="close" color={c.muted} onPress={() => removeFile(f)} />
+          </View>
+        ))}
+        <View style={{ height: 10 }} />
+        <Button icon="document-attach-outline" title="Chọn tệp (PDF, Word, slide...)" color={c.muted} onPress={addFile} />
+        <Text style={s.sub}>Mỗi tệp tối đa {MAX_FILE_LABEL}. Tệp được lưu ngay trên máy của bạn.</Text>
       </FormCard>
 
       <ErrorText text={error} />

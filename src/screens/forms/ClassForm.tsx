@@ -1,6 +1,7 @@
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
+import { showAlert } from '../../dialog';
 import { DateTimeField } from '../../DateTimeField';
 import { useStore } from '../../store';
 import { DAYS, fromHHMM, toHHMM } from '../../utils';
@@ -39,7 +40,7 @@ export default function ClassForm() {
     const clash = classes.find((x) => x.id !== id && x.weekday === weekday && x.start < data.end && x.end > data.start);
     if (clash) {
       const name = subjects.find((x) => x.id === clash.subjectId)?.name ?? 'một môn khác';
-      return Alert.alert('Trùng giờ học', `Trùng với ${name} (${clash.start}–${clash.end}).`, [
+      return showAlert('Trùng giờ học', `Trùng với ${name} (${clash.start}–${clash.end}).`, [
         { text: 'Hủy', style: 'cancel' },
         { text: 'Vẫn lưu', onPress: () => save(data) },
       ]);
