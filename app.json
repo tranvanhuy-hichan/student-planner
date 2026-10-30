@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true
     },
@@ -20,6 +20,16 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "@react-native-community/datetimepicker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Cho phép Student Planner chọn ảnh để đính kèm vào ghi chú.",
+          "cameraPermission": "Cho phép Student Planner chụp ảnh bảng, tài liệu để đính kèm vào ghi chú."
+        }
+      ]
+    ]
   }
 }
